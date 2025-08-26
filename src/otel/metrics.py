@@ -57,3 +57,10 @@ memory_usage_gauge = meter.create_observable_gauge(
     callbacks=[get_memory_usage],
     description="Tracks the memory usage of the application in bytes",
 )
+
+response_time_histogram = meter.create_histogram(
+    name="response_time_ms",
+    description="Tracks the response time of requests",
+    unit="ms",
+    explicit_bucket_boundaries_advisory=[0, 50, 100, 200, 300, 400]
+)

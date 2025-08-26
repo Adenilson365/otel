@@ -1,9 +1,10 @@
 from fastapi import FastAPI, Response, status, Request
 import os
 import random
+import time
 from typing import List
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
-from otel.metrics import request_counter, active_users_gauge
+from otel.metrics import request_counter, active_users_gauge, response_time_histogram
 
 
 APP_NAME = os.getenv("APP_NAME", "api-otel")
@@ -37,6 +38,17 @@ async def read_users():
 def process_request():
     request_counter.add(1, {"endpoint": "/process", "app": APP_NAME, "method": "POST"})
     return {"message": "Processing request..."}
+
+@app.get("/response_time")
+def get_response_time():
+    """
+    Endpoint para simular latência 
+    """
+    start_time = time.time()
+    time.sleep(random.uniform(0.10, 0.50))
+    duration = time.time() - start_time
+    response_time_histogram.record(duration * 1000, {"app": APP_NAME, "endpoint": "/response_time", "method": "GET"})
+    return {"response_time": duration * 1000}
 
 # Rota /metrics
 @app.get("/metrics")
