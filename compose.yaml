@@ -5,36 +5,150 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
+    environment:
+      - TARGET_API_ENV=http://app-b:8000
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - APP_VERSION=1.0.0
+      - APP_NAME=app-a
     networks:
       - app
+    depends_on:
+      - otel-collector
   app-b:
     build:
       context: .
       dockerfile: Dockerfile
     ports:
       - "8001:8000"
+    environment:
+      - TARGET_API_ENV=http://app-c:8000
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - APP_VERSION=1.0.0
+      - APP_NAME=app-b
     networks:
       - app
+    depends_on:
+      - otel-collector
   app-c:
     build:
       context: .
       dockerfile: Dockerfile
     ports:
       - "8002:8000"
+    environment:
+      - APP_NAME=app-c
+      - APP_VERSION=1.0.0
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
     networks:
       - app
+    depends_on:
+      - otel-collector
   prometheus:
     image: prom/prometheus
     volumes:
-      - ./prometheus/prometheus.yaml:/etc/prometheus/prometheus.yaml
+      - ./.docker/prometheus.yaml:/etc/prometheus/prometheus.yaml
     command:
       - "--config.file=/etc/prometheus/prometheus.yaml"
     ports:
       - "9090:9090"
     networks:
       - app
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger
+    ports:
+      - "16686:16686"
+      - "14250:14250"
+      - "14268:14268"
+      - "6831:6831/udp"
+      - "6832:6832/udp"
+    environment:
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+    networks:
+      - app
+  loki:
+    image: grafana/loki:latest
+    ports:
+      - "3100:3100"
+    networks:
+      - app
+  grafana:
+    environment:
+      - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_FEATURE_TOGGLES_ENABLE=alertingSimplifiedRouting,alertingQueryAndExpressionsStepMode
+    entrypoint:
+      - sh
+      - -euc
+      - |
+        mkdir -p /etc/grafana/provisioning/datasources
+        cat <<EOF > /etc/grafana/provisioning/datasources/ds.yaml
+        apiVersion: 1
+        datasources:
+        - name: Loki
+          type: loki
+          access: proxy 
+          orgId: 1
+          url: http://loki:3100
+          basicAuth: false
+          isDefault: false
+          version: 1
+          editable: false
+        - name: Jaeger
+          type: jaeger
+          access: proxy
+          orgId: 1
+          url: http://jaeger:16686
+          basicAuth: false
+          isDefault: false
+          version: 1
+          editable: false
+          uid: jaeger
+        - name: Prometheus
+          type: prometheus
+          access: proxy
+          orgId: 1
+          url: http://prometheus:9090
+          basicAuth: false
+          isDefault: true
+          version: 1
+          editable: false
+          uid: prometheus
+        EOF
+        /run.sh
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    networks:
+      - app
     depends_on:
-      - app-a
+      - loki
+      - jaeger
+      - prometheus
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.128.0
+    command: ["--config", "/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./.docker/collector.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4318:4318"
+      - "4317:4317"
+      - "8889:8889"
+    networks:
+      - app
+    depends_on:
+      - jaeger
+      - prometheus
+      - loki
+      - grafana
+  # ubuntu:
+  #   image: ubuntu:latest
+  #   container_name: ubuntu
+  #   command: sleep infinity
+  #   networks:
+  #     - app
+
 networks:
   app:
     driver: bridge

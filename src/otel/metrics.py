@@ -1,20 +1,32 @@
+
+from typing import Iterable
+import random
+import psutil
+import config
+#Bibliotecas de observabilidade
 from opentelemetry import metrics
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.exporter.prometheus import PrometheusMetricReader
-import os
-from typing import Iterable
 from opentelemetry.metrics import CallbackOptions, Observation
-import random
-import psutil
+from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
+from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader 
 
-APP_NAME = os.getenv("APP_NAME", "api-otel")
+
+
+APP_NAME = config.APP_NAME
 
 prometheus_reader = PrometheusMetricReader()
+otlp_metric_exporter = OTLPMetricExporter(
+    endpoint=f'{config.OTLP_ENDPOINT}/v1/metrics'
+)
 
+otlp_metric_reader = PeriodicExportingMetricReader(
+    otlp_metric_exporter, 
+    export_interval_millis=1000)
 #Define o provider de métricas
 metrics.set_meter_provider(
     MeterProvider(
-        metric_readers=[prometheus_reader]
+        metric_readers=[prometheus_reader, otlp_metric_reader]
     )
 )
 
