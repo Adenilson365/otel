@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: gcs-test
+  annotations:
+    iam.gke.io/gcp-service-account: grafana-tempo-gcs@develop-464014.iam.gserviceaccount.com
+spec:
+  serviceAccountName: tempo # ou a SA do Kubernetes ligada à conta do GCP
+  containers:
+    - name: gcloud
+      image: google/cloud-sdk:slim
+      command: ["/bin/sh"]
+      args: ["-c", "sleep 3600"]

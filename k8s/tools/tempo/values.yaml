@@ -4,7 +4,8 @@ tempo:
       backend: gcs
       gcs:
         bucket: grafana-tempo-develop-464014
-        service_account_key_path: /var/secrets/gcs/tempo-sa.json
+        service_account: grafana-tempo-gcs@develop-464014.iam.gserviceaccount.com
+        insecure: true
 
   server:
     log:
@@ -18,13 +19,3 @@ tempo:
           endpoint: 0.0.0.0:4317
         http:
           endpoint: 0.0.0.0:4318
-
-extraVolumes:
-  - name: gcs-creds
-    secret:
-      secretName: tempo-gcs
-
-extraVolumeMounts:
-  - name: gcs-creds
-    mountPath: /var/secrets/gcs
-    readOnly: true
