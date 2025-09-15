@@ -1,0 +1,113 @@
+mode: deployment
+replicaCount: 1 # Não deve ter mais de uma replica, para evitar dados duplicados.
+
+presets:
+  clusterMetrics:
+    enabled: true
+  kubernetesEvents:
+    enabled: true
+image:
+  repository: otel/opentelemetry-collector-contrib
+  tag: "0.128.0"
+  pullPolicy: IfNotPresent
+
+config:
+  receivers:
+    otlp: # O Collector recebe dados no formato OTLP (OpenTelemetry Protocol)
+      protocols:
+        http: # Habilita a recepção de traces via HTTP
+          endpoint: 0.0.0.0:4318 # Escuta em todas as interfaces na porta 4318
+        grpc: # Habilita a recepção de traces via gRPC
+          endpoint: 0.0.0.0:4317 # Escuta em todas as interfaces na porta 4317
+
+  processors:
+    batch:
+      timeout: 1s
+      send_batch_size: 1024
+
+  exporters:
+    debug:
+      verbosity: detailed
+    prometheus:
+      endpoint: "0.0.0.0:8889"
+
+    otlp/jaeger:
+      endpoint: "jaeger:4317"
+      tls:
+        insecure: true
+    otlp/tempo:
+      endpoint: "tempo:4317"
+      tls:
+        insecure: true
+
+    loki:
+      endpoint: http://loki:3100/loki/api/v1/push
+
+  service:
+    pipelines:
+      traces:
+        receivers: [otlp]
+        processors: [batch]
+        exporters: [otlp/tempo, debug]
+      metrics:
+        receivers: [otlp]
+        processors: [batch]
+        exporters: [prometheus, debug]
+      logs:
+        receivers: [otlp]
+        processors: [batch]
+        exporters: [loki, debug]
+
+# Configuração de portas - propriedades corretas conforme schema
+ports:
+  jaeger-compact:
+    enabled: false
+  jaeger-thrift:
+    enabled: false
+  jaeger-grpc:
+    enabled: false
+  zipkin:
+    enabled: false
+  otlp:
+    enabled: true
+    containerPort: 4317
+    servicePort: 4317
+    protocol: TCP
+  otlp-http:
+    enabled: true
+    containerPort: 4318
+    servicePort: 4318
+    protocol: TCP
+  metrics:
+    enabled: true
+    containerPort: 8889
+    servicePort: 8889
+    protocol: TCP
+
+# Configuração do serviço
+service:
+  type: ClusterIP
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+serviceAccount:
+  create: true
+
+podSecurityContext:
+  fsGroup: 1000
+
+extraEnvs:
+  - name: OTEL_RESOURCE_ATTRIBUTES
+    value: "service.name=otel-collector,deployment.environment=production"
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
