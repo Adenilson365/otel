@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: gcs-test
+  name: gcs-test2
   annotations:
     iam.gke.io/gcp-service-account: grafana-tempo-gcs@develop-464014.iam.gserviceaccount.com
 spec:

@@ -1,21 +1,40 @@
+#Configure tempo Contribution Chart to use GCS as storage backend
+# Abre as portas de ingestão no Service do distributor e injeta os receivers
+
+traces:
+  otlp:
+    grpc:
+      enabled: true # expõe 4317
+    http:
+      enabled: true # expõe 4318
+
 tempo:
-  storage:
-    trace:
-      backend: gcs
-      gcs:
-        bucket: grafana-tempo-develop-464014
-        service_account: grafana-tempo-gcs@develop-464014.iam.gserviceaccount.com
-        insecure: true
+  structuredConfig:
+    server:
+      http_listen_port: 3200
+      log_level: debug
+      log_format: logfmt
 
-  server:
-    log:
-      level: debug
-      format: logfmt
+    distributor:
+      receivers:
+        otlp:
+          protocols:
+            grpc:
+              endpoint: "0.0.0.0:4317"
+            http:
+              endpoint: "0.0.0.0:4318"
 
-  receivers:
-    otlp:
-      protocols:
-        grpc:
-          endpoint: 0.0.0.0:4317
-        http:
-          endpoint: 0.0.0.0:4318
+    storage:
+      trace:
+        backend: gcs
+        gcs:
+          bucket_name: grafana-tempo-develop-464014
+
+  ingester:
+    replicas: 1
+    compaction:
+      compaction_window: 1h
+      max_compaction_objects: 1000000
+      block_retention: 1h
+      compacted_block_retention: 10m
+      flush_size_bytes: 5242880 #5MB
